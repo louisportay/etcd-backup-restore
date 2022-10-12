@@ -1,5 +1,12 @@
 # Etcd-Backup-Restore
 
+## Warning about this fork
+
+This fork existence is due to the project [reluctance](https://github.com/gardener/etcd-backup-restore/issues/544) to add metrics to the snapshotter endpoint.
+Adding this feature meant breaking the server endpoint as the interop between two subcommands is messy.
+
+/!\ Use this fork at your own risk /!\
+
 [![CI Build status](https://concourse.ci.gardener.cloud/api/v1/teams/gardener/pipelines/etcd-backup-restore-master/jobs/master-head-update-job/badge)](https://concourse.ci.gardener.cloud/teams/gardener/pipelines/etcd-backup-restore-master/jobs/master-head-update-job)
 [![Go Report Card](https://goreportcard.com/badge/github.com/gardener/etcd-backup-restore)](https://goreportcard.com/report/github.com/gardener/etcd-backup-restore)
 [![GoDoc](https://godoc.org/github.com/gardener/etcd-backup-restore?status.svg)](https://godoc.org/github.com/gardener/etcd-backup-restore)

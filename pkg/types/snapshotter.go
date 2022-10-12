@@ -49,6 +49,9 @@ const (
 
 	// DeltaSnapshotIntervalThreshold is interval between delta snapshot
 	DeltaSnapshotIntervalThreshold = time.Second
+
+	// DefaultPort is port used by HTTP server to serve /metrics endpoint
+	DefaultPort = 8080
 )
 
 // SnapshotterState denotes the state the snapshotter would be in.
@@ -62,6 +65,7 @@ type SnapshotterConfig struct {
 	GarbageCollectionPeriod  wrappers.Duration `json:"garbageCollectionPeriod,omitempty"`
 	GarbageCollectionPolicy  string            `json:"garbageCollectionPolicy,omitempty"`
 	MaxBackups               uint              `json:"maxBackups,omitempty"`
+	Port                     uint              `json:"Port,omitempty"`
 }
 
 // AddFlags adds the flags to flagset.
@@ -72,6 +76,7 @@ func (c *SnapshotterConfig) AddFlags(fs *flag.FlagSet) {
 	fs.DurationVar(&c.GarbageCollectionPeriod.Duration, "garbage-collection-period", c.GarbageCollectionPeriod.Duration, "Period for garbage collecting old backups")
 	fs.StringVar(&c.GarbageCollectionPolicy, "garbage-collection-policy", c.GarbageCollectionPolicy, "Policy for garbage collecting old backups")
 	fs.UintVarP(&c.MaxBackups, "max-backups", "m", c.MaxBackups, "maximum number of previous backups to keep")
+	fs.UintVar(&c.Port, "port", c.Port, "port used by HTTP server to serve /metrics endpoint")
 }
 
 // Validate validates the config.
@@ -93,6 +98,9 @@ func (c *SnapshotterConfig) Validate() error {
 	if c.DeltaSnapshotMemoryLimit < 1 {
 		logrus.Infof("Found delta snapshot memory limit %d bytes less than 1 byte. Setting it to default: %d ", c.DeltaSnapshotMemoryLimit, DefaultDeltaSnapMemoryLimit)
 		c.DeltaSnapshotMemoryLimit = DefaultDeltaSnapMemoryLimit
+	}
+	if c.Port <= 1024 || c.Port > 49151 {
+		return fmt.Errorf("invalid port %d for exposing HTTP /metrics endpoint, please use user ports between 1024 and 49151")
 	}
 	return nil
 }

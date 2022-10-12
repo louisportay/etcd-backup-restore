@@ -20,7 +20,9 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io"
+	"net/http"
 	"path"
 	"sync"
 	"time"
@@ -67,6 +69,7 @@ func NewSnapshotterConfig() *brtypes.SnapshotterConfig {
 		GarbageCollectionPeriod:  wrappers.Duration{Duration: brtypes.DefaultGarbageCollectionPeriod},
 		GarbageCollectionPolicy:  brtypes.GarbageCollectionPolicyExponential,
 		MaxBackups:               brtypes.DefaultMaxBackups,
+		Port:                     brtypes.DefaultPort,
 	}
 }
 
@@ -97,6 +100,7 @@ type Snapshotter struct {
 	lastEventRevision    int64
 	K8sClientset         client.Client
 	snapstoreConfig      *brtypes.SnapstoreConfig
+	server               *http.Server
 }
 
 // NewSnapshotter returns the snapshotter object.
@@ -136,6 +140,14 @@ func NewSnapshotter(logger *logrus.Entry, config *brtypes.SnapshotterConfig, sto
 		}
 	}
 
+	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
+
+	s := http.Server{
+		Addr:    fmt.Sprintf(":%d", config.Port),
+		Handler: mux,
+	}
+
 	return &Snapshotter{
 		logger:               logger.WithField("actor", "snapshotter"),
 		store:                store,
@@ -157,6 +169,7 @@ func NewSnapshotter(logger *logrus.Entry, config *brtypes.SnapshotterConfig, sto
 		cancelWatch:        func() {},
 		K8sClientset:       clientSet,
 		snapstoreConfig:    storeConfig,
+		server:             &s,
 	}, nil
 }
 
@@ -165,6 +178,15 @@ func NewSnapshotter(logger *logrus.Entry, config *brtypes.SnapshotterConfig, sto
 // taking the first full snapshot.
 func (ssr *Snapshotter) Run(stopCh <-chan struct{}, startWithFullSnapshot bool) error {
 	defer ssr.stop()
+
+	go func() {
+		ssr.logger.Infof("Starting HTTP server at addr: %s", ssr.server.Addr)
+		err := ssr.server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			ssr.logger.Fatalf("Failed to start http server: %v", err)
+		}
+	}()
+
 	if startWithFullSnapshot {
 		ssr.fullSnapshotTimer = time.NewTimer(0)
 	} else {
@@ -242,6 +264,8 @@ func (ssr *Snapshotter) stop() {
 		ssr.deltaSnapshotTimer = nil
 	}
 	ssr.closeEtcdClient()
+
+	ssr.server.Close()
 
 	ssr.SsrState = brtypes.SnapshotterInactive
 	ssr.SsrStateMutex.Unlock()
